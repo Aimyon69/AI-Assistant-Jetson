@@ -3,6 +3,7 @@ import struct
 import numpy as np
 import cv2
 import os
+import time
 
 face_recognize={
     'IP':'192.168.55.100',
@@ -13,6 +14,9 @@ class FRS:
     def __init__(self,IP=face_recognize['IP'],PORT=face_recognize['PORT']):
         self.IP=IP
         self.PORT=PORT
+        current_path=os.path.abspath(__file__)
+        current_dir=os.path.dirname(current_path)
+        self.stranger_saved_path=os.path.join(current_dir,'stranger')
         
     def revcall(self,sock,count):
         buf=b''
@@ -29,19 +33,12 @@ class FRS:
         return buf
 
     def handle_request(self,msg_str,img):
-        if msg_str=='':
-            return
-        data_list=msg_str.split(' ')
-        if len(data_list)==2:
-            print('Host')
-        else:
-            if data_list[0]=='False':
-                os.system('rundll32.exe user32.dll,LockWorkStation')
-                print('stranger')
-            else:
-                os.system('rundll32.exe user32.dll,LockWorkStation')
-                print('no face')
-        
+        if msg_str=='stranger':
+            date=time.ctime()
+            file_name=os.path.join(self.stranger_saved_path,date)
+            cv2.imwrite(file_name,img)
+        os.system('rundll32.exe user32.dll,LockWorkStation')
+
     def server(self):
         server_socket=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         try:

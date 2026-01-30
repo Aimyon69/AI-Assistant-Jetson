@@ -5,9 +5,12 @@ import cv2 as cv
 import numpy as np
 from utils.camera.camera_utils import init_camera
 from utils.socket.tcp.tcp_utils import send_data
-from utils.socket.socket_config import face_recognize
+from utils.socket.socket_config import sock_face_config
 import time
 from utils.camera.camera_config import camera_para
+from utils.Hostcontrol_utils.check_pc_status import is_pc_online
+from utils.Hostcontrol_utils.CH9329Controller import CH9329Controller
+from utils.Hostcontrol_utils.password import password
 
 class FaceRecognition:
     def __init__(self):
@@ -93,13 +96,13 @@ class FaceRecognition:
         self.load_face_db()
 
     def run(self):
-        # pre_state=True(Host device on):只需要对目标人脸消失以及陌生人响应
-        # pre_state=False(Host device off):只需要陌生人与目标人脸出现响应
+        con=CH9329Controller()
         pre_state=False
         loss=0
-        danger=0
-        Host_IP=face_recognize['IP']
-        PORT=face_recognize['PORT']
+        stranger=0
+        on=0
+        Host_IP=sock_face_config['IP']
+        Port=sock_face_config['PORT']
         cap=init_camera()
         if cap is None:
             return
@@ -109,27 +112,35 @@ class FaceRecognition:
                 print('capture fail')
                 continue
             result=self.recognize(frame)
-            if result is not None and not result[0]:
-                danger+=1
-                if danger==5:
-                    if send_data(Host_IP,PORT,'False',frame):
-                        pre_state=False
-                        danger=0
-                        loss=0
-            elif result is None and pre_state:
-                loss+=1
-                if loss==10:
-                    if send_data(Host_IP,PORT,'Locked'):
-                        pre_state=False
-                        danger=0
-                        loss=0
-            elif result is not None and result[0] and not pre_state:
-                message='on'+' '+result[1]
-                if send_data(Host_IP,PORT,message):
-                    pre_state=True
-                    danger=0
-                    loss=0
+            if result is not None:
+                if not result[0] and pre_state:
+                    stranger+=1
+                    if stranger==5:
+                        if send_data(Host_IP,Port,'stranger',frame):
+                            pre_state=False
+                            loss=stranger=on=0
+                elif result[0] and not pre_state:
+                    on+=1
+                    if on==2:
+                        if is_pc_online(Host_IP):
+                            con.type_string('\n')
+                            con.type_string(password)
+                        else:
+                            pass
+                        pre_state=True
+                        loss=stranger=on=0
+            else:
+                if pre_state:
+                    loss+=1
+                    if loss==5:
+                        if send_data(Host_IP,Port,'locked'):
+                            pre_state=False
+                            loss=stranger=on=0
             time.sleep(1)
+
+                            
+
+                    
 
 
 
